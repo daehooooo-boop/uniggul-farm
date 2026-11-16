@@ -11,6 +11,14 @@ function kstDate(iso: string | null) {
   return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", weekday: "short" }).format(new Date(iso));
 }
 
+/** 배지에는 짧게: "11/10부터 가격인하" → "가격인하" */
+function shortLabel(label: string | null) {
+  if (!label) return "할인";
+  if (label.includes("가격인하")) return "가격인하";
+  if (label.includes("기간한정")) return "기간한정";
+  return "할인";
+}
+
 const CHANNELS = [
   {
     id: "discord",
@@ -93,7 +101,7 @@ export default async function Home() {
       <section className="sec" id="sale">
         <h2 className="label">
           <span>이번 주 할인</span>
-          {sale.count > 0 && <span>{sale.count.toLocaleString("ko-KR")}개 · 할인율 순</span>}
+          {sale.count > 0 && <span>{sale.count.toLocaleString("ko-KR")}개</span>}
         </h2>
         {items.length ? (
           <div className="items">
@@ -104,14 +112,15 @@ export default async function Home() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={it.image} alt="" loading="lazy" />
                   )}
-                  <span className="off">{it.discountPct}%</span>
+                  <span className="off">{it.pct ? `${it.pct}%` : shortLabel(it.label)}</span>
                 </div>
                 <div className="meta">
                   <span className="name">{it.name}</span>
                   <span className="price">
-                    <b>{won(it.promoPrice)}</b>
-                    <s>{won(it.basePrice)}</s>
+                    <b>{won(it.price)}</b>
+                    {it.original && <s>{won(it.original)}</s>}
                   </span>
+                  {it.label && <span className="flag">{it.label}</span>}
                 </div>
               </a>
             ))}

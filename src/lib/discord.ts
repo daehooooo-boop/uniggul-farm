@@ -5,7 +5,7 @@
 import { createPublicKey, verify } from "node:crypto";
 import * as core from "./core";
 import * as db from "./db";
-import { discountPct, isOnSale, parseProductRef, productUrl, won, type Product } from "./uniqlo";
+import { isOnSale, parseProductRef, priceView, productUrl, won, type PriceView, type Product } from "./uniqlo";
 
 const API = "https://discord.com/api/v10";
 const COLOR = 0xf5a623;
@@ -56,16 +56,16 @@ async function editOriginal(token: string, content: unknown) {
 
 // --- formatting --------------------------------------------------------------
 
-function priceLine(base: number | null, promo: number | null) {
-  const p = { basePrice: base, promoPrice: promo };
-  return isOnSale(p) ? `~~${won(base)}~~ → **${won(promo)}** (${discountPct(p)}% ↓)` : won(base);
+function priceLine(v: PriceView) {
+  const main = v.original ? `~~${won(v.original)}~~ → **${won(v.price)}** (${v.pct}% ↓)` : `**${won(v.price)}**`;
+  return v.label ? `${main} · ${v.label}` : main;
 }
 
-function productEmbed(p: Product, title = p.name, extra = "") {
+function productEmbed(p: Product, title = p.name, extra = "", view: PriceView = priceView(p)) {
   return {
     title,
     url: productUrl(p),
-    description: priceLine(p.basePrice, p.promoPrice) + (extra ? `\n${extra}` : ""),
+    description: priceLine(view) + (extra ? `\n${extra}` : ""),
     color: COLOR,
     ...(p.image ? { thumbnail: { url: p.image } } : {}),
   };
@@ -77,7 +77,7 @@ export function saleEmbeds(sale: core.SaleList) {
   const chunks: string[] = [];
   let cur = "";
   for (const it of items) {
-    const line = `[${it.name}](${it.url}) · ${priceLine(it.basePrice, it.promoPrice)}\n`;
+    const line = `[${it.name}](${it.url}) · ${priceLine(it)}\n`;
     if (cur.length + line.length > 3900) {
       chunks.push(cur);
       cur = "";
@@ -94,9 +94,9 @@ export function saleEmbeds(sale: core.SaleList) {
 
 // --- notifications -------------------------------------------------------------
 
-export async function sendSaleAlert(userId: string, p: Product) {
+export async function sendSaleAlert(userId: string, p: Product, view: PriceView = priceView(p)) {
   const ch = (await api("/users/@me/channels", { method: "POST", json: { recipient_id: userId } })) as { id: string };
-  await api(`/channels/${ch.id}/messages`, { method: "POST", json: { embeds: [productEmbed(p, `🔔 할인 시작: ${p.name}`)] } });
+  await api(`/channels/${ch.id}/messages`, { method: "POST", json: { embeds: [productEmbed(p, `🔔 할인 시작: ${p.name}`, "", view)] } });
 }
 
 export async function sendWeekly(sale: core.SaleList) {
@@ -197,7 +197,7 @@ export async function handleInteraction(i: Interaction): Promise<{ response: unk
           const lines = rows.map((r) => {
             const p = live.get(r.product_id);
             const url = productUrl({ productId: r.product_id, priceGroup: r.price_group });
-            return `\`${r.product_id}\` [${r.name}](${url}) · ${p ? priceLine(p.basePrice, p.promoPrice) : won(r.base_price)}`;
+            return `\`${r.product_id}\` [${r.name}](${url}) · ${p ? priceLine(priceView(p, r.base_price)) : won(r.base_price)}`;
           });
           await editOriginal(i.token, { embeds: [{ title: "내 관심 상품", description: lines.join("\n").slice(0, 4000), color: COLOR }] });
         },

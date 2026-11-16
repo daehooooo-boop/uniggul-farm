@@ -79,7 +79,7 @@ a.pill:hover { background: var(--pill-hover); }
 
 .items { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 4px; }
 .item { background: var(--card); box-shadow: var(--shadow); border-radius: 20px; overflow: hidden; text-decoration: none; display: flex; flex-direction: column; }
-.item .thumb { aspect-ratio: 1; background: var(--thumb); position: relative; }
+.item .thumb { aspect-ratio: 3 / 4; background: var(--thumb); position: relative; }
 .item .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .item .off { position: absolute; left: 10px; top: 10px; background: var(--honey); color: #fff; border-radius: 999px; padding: 3px 8px; font-size: 11px; font-weight: 600; line-height: 1.3; font-variant-numeric: tabular-nums; }
 .item .meta { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 4px; }
@@ -87,6 +87,7 @@ a.pill:hover { background: var(--pill-hover); }
 .item .price { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
 .item .price b { font-weight: 600; }
 .item .price s { color: var(--sub); font-size: 12px; }
+.item .flag { color: var(--honey); font-size: 12px; }
 .empty { background: var(--pill); border-radius: 20px; padding: 28px 20px; text-align: center; color: var(--sub); margin: 0 4px; }
 .more { padding: 0 20px; }
 

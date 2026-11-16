@@ -5,7 +5,7 @@
  */
 import * as core from "./core";
 import * as db from "./db";
-import { discountPct, isOnSale, productUrl, resolveProductRef, won, type Product } from "./uniqlo";
+import { isOnSale, priceView, productUrl, resolveProductRef, won, type PriceView, type Product } from "./uniqlo";
 
 const PLATFORM = "telegram" as const;
 const env = () => ({
@@ -35,9 +35,9 @@ const HELP =
 
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
 
-function priceHtml(base: number | null, promo: number | null) {
-  const p = { basePrice: base, promoPrice: promo };
-  return isOnSale(p) ? `<s>${won(base)}</s> → <b>${won(promo)}</b> (${discountPct(p)}% ↓)` : won(base);
+function priceHtml(v: PriceView) {
+  const main = v.original ? `<s>${won(v.original)}</s> → <b>${won(v.price)}</b> (${v.pct}% ↓)` : `<b>${won(v.price)}</b>`;
+  return v.label ? `${main} · ${esc(v.label)}` : main;
 }
 
 export async function tg(method: string, body: Record<string, unknown>) {
@@ -60,7 +60,7 @@ export function saleMessages(sale: core.SaleList): string[] {
   const msgs: string[] = [];
   let cur = `<b>🍯 이번 주 유니클로 할인 ${sale.count}개</b> (할인율 순)\n\n`;
   for (const it of items) {
-    const line = `• <a href="${it.url}">${esc(it.name)}</a>\n   ${priceHtml(it.basePrice, it.promoPrice)}\n`;
+    const line = `• <a href="${it.url}">${esc(it.name)}</a>\n   ${priceHtml(it)}\n`;
     if (cur.length + line.length > 3800) {
       msgs.push(cur);
       cur = "";
@@ -73,9 +73,9 @@ export function saleMessages(sale: core.SaleList): string[] {
 
 // --- notifications -------------------------------------------------------------
 
-export async function sendSaleAlert(chatId: string, p: Product) {
+export async function sendSaleAlert(chatId: string, p: Product, view: PriceView = priceView(p)) {
   try {
-    await send(chatId, `🔔 <b>할인 시작!</b>\n<a href="${productUrl(p)}">${esc(p.name)}</a>\n${priceHtml(p.basePrice, p.promoPrice)}`, {
+    await send(chatId, `🔔 <b>할인 시작!</b>\n<a href="${productUrl(p)}">${esc(p.name)}</a>\n${priceHtml(view)}`, {
       link_preview_options: { is_disabled: false, url: productUrl(p) },
     });
   } catch (e) {
@@ -145,7 +145,7 @@ export async function handleUpdate(u: Update) {
     else {
       const p = r.product;
       const note = isOnSale(p) ? "지금 할인 중이에요! 더 내려가면 다시 알려드릴게요." : "할인되면 바로 알려드릴게요.";
-      out = `✅ 등록했어요\n<a href="${productUrl(p)}">${esc(p.name)}</a>\n${priceHtml(p.basePrice, p.promoPrice)}\n\n${note}`;
+      out = `✅ 등록했어요\n<a href="${productUrl(p)}">${esc(p.name)}</a>\n${priceHtml(priceView(p))}\n\n${note}`;
     }
   } catch (e) {
     console.error(e);
@@ -163,7 +163,7 @@ async function myList(chat: string) {
   const buttons = rows.map((r, idx) => {
     const p = live.get(r.product_id);
     const url = productUrl({ productId: r.product_id, priceGroup: r.price_group });
-    lines.push(`${idx + 1}. <a href="${url}">${esc(r.name)}</a>\n   ${p ? priceHtml(p.basePrice, p.promoPrice) : won(r.base_price)}`);
+    lines.push(`${idx + 1}. <a href="${url}">${esc(r.name)}</a>\n   ${p ? priceHtml(priceView(p, r.base_price)) : won(r.base_price)}`);
     return [{ text: `❌ ${idx + 1}. ${r.name.slice(0, 28)}`, callback_data: `del:${r.product_id}` }];
   });
   return send(chat, lines.join("\n"), { reply_markup: { inline_keyboard: buttons } });

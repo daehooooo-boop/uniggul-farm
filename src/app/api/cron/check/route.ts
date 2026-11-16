@@ -10,10 +10,10 @@ export async function GET(req: Request) {
   if (!isAuthorized(req)) return unauthorized();
   const alerts = await findAlerts();
   let sent = 0;
-  for (const { watch, product } of alerts) {
+  for (const { watch, product, view } of alerts) {
     try {
-      if (watch.platform === "discord") await discord.sendSaleAlert(watch.user_id, product);
-      else await telegram.sendSaleAlert(watch.user_id, product);
+      if (watch.platform === "discord") await discord.sendSaleAlert(watch.user_id, product, view);
+      else await telegram.sendSaleAlert(watch.user_id, product, view);
       sent++;
     } catch (e) {
       console.warn("alert failed", watch.platform, watch.user_id, e);

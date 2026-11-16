@@ -13,6 +13,8 @@ const HEADERS = {
   "Accept-Language": "ko-KR,ko;q=0.9",
 };
 
+export type SaleFlag = { code: string; name: string; start: number | null; end: number | null };
+
 export type Product = {
   productId: string;
   priceGroup: string;
@@ -20,13 +22,40 @@ export type Product = {
   basePrice: number | null;
   promoPrice: number | null;
   image: string | null;
+  flags: SaleFlag[];
 };
 
-export const isOnSale = (p: Pick<Product, "basePrice" | "promoPrice">) =>
-  p.promoPrice != null && p.basePrice != null && p.promoPrice < p.basePrice;
+/**
+ * 유니클로 한국의 할인 표시.
+ * discount = "가격인하"(정가 자체를 내림), limitedOffer = 기간한정가격, colorSizeLimitedPrice = 일부 색상·사이즈만.
+ * 가격인하 상품은 API가 내린 가격만 주고 원래 가격은 주지 않는다. 그래서 원래 가격은 우리가 본 가격 기록으로 계산한다.
+ */
+export const SALE_FLAG_CODES = ["discount", "limitedOffer", "colorSizeLimitedPrice"];
 
-export const discountPct = (p: Pick<Product, "basePrice" | "promoPrice">) =>
-  isOnSale(p) ? Math.round((1 - p.promoPrice! / p.basePrice!) * 100) : 0;
+export const currentPrice = (p: Pick<Product, "basePrice" | "promoPrice">) => p.promoPrice ?? p.basePrice;
+
+export const saleFlag = (p: Pick<Product, "flags">) => p.flags.find((f) => SALE_FLAG_CODES.includes(f.code)) ?? null;
+
+export const isOnSale = (p: Pick<Product, "basePrice" | "promoPrice" | "flags">) =>
+  !!saleFlag(p) || (p.promoPrice != null && p.basePrice != null && p.promoPrice < p.basePrice);
+
+/** 표시용 가격. ref는 우리가 기록해 둔 이전 최고 가격. */
+export type PriceView = { price: number | null; original: number | null; pct: number; label: string | null };
+
+export function priceView(p: Pick<Product, "basePrice" | "promoPrice" | "flags">, ref?: number | null): PriceView {
+  const price = currentPrice(p);
+  const top = Math.max(p.basePrice ?? 0, ref ?? 0);
+  const original = price != null && top > price ? top : null;
+  const pct = original && price != null ? Math.round((1 - price / original) * 100) : 0;
+  const f = saleFlag(p);
+  return { price, original, pct, label: f ? flagLabel(f) : null };
+}
+
+export function flagLabel(f: SaleFlag) {
+  const name = f.name.replace(/^\d{4}\//, "").trim();
+  if (name) return name;
+  return f.code === "discount" ? "가격인하" : f.code === "limitedOffer" ? "기간한정가격" : "일부 색상·사이즈 할인";
+}
 
 export const productUrl = (p: Pick<Product, "productId" | "priceGroup">) =>
   `https://www.uniqlo.com/kr/ko/products/${p.productId}/${p.priceGroup || "00"}`;
@@ -92,6 +121,16 @@ function firstImage(item: Json): string | null {
   return (f.image as string) ?? (f.url as string) ?? null;
 }
 
+function parseFlags(item: Json): SaleFlag[] {
+  const rep = item.representative as Json | undefined;
+  const raw = ((rep?.flags as Json | undefined)?.priceFlags as Json[] | undefined) ?? [];
+  return raw.map((f) => {
+    const t = (f.effectiveTime as Json | undefined) ?? {};
+    const num = (v: unknown) => (typeof v === "number" && v > 0 ? v : null);
+    return { code: String(f.code ?? ""), name: String(f.name ?? ""), start: num(t.start), end: num(t.end) };
+  });
+}
+
 export function parseItem(item: Json): Product {
   const prices = (item.prices as Json | undefined) ?? {};
   return {
@@ -101,6 +140,7 @@ export function parseItem(item: Json): Product {
     basePrice: priceValue(prices.base),
     promoPrice: priceValue(prices.promo),
     image: firstImage(item),
+    flags: parseFlags(item),
   };
 }
 
@@ -127,18 +167,20 @@ export async function getProduct(id: string): Promise<Product | null> {
   return (await getProducts([id])).get(id) ?? null;
 }
 
-/** 전체 상품을 훑어 정가보다 싼 상품만 할인율 순으로 돌려준다. */
-export async function getAllOnSale(pageSize = 100, maxPages = 60): Promise<Product[]> {
-  const sale: Product[] = [];
-  for (let page = 0; page < maxPages; page++) {
-    const data = await get("/products", { offset: page * pageSize, limit: pageSize });
-    const items = itemsOf(data);
-    sale.push(...items.map(parseItem).filter(isOnSale));
-    const total = Number(((data.result as Json | undefined)?.pagination as Json | undefined)?.total ?? NaN);
-    if (items.length < pageSize || (!Number.isNaN(total) && (page + 1) * pageSize >= total)) break;
+/**
+ * 할인 표시(가격인하·기간한정)가 붙은 상품을 모두 모은다.
+ * 유니클로는 조건 없는 전체 목록을 주지 않아서 flagCodes로 걸러 받아야 한다.
+ */
+export async function getAllOnSale(pageSize = 100, maxPages = 30): Promise<Product[]> {
+  const byId = new Map<string, Product>();
+  for (const flag of ["discount", "limitedOffer"]) {
+    for (let page = 0; page < maxPages; page++) {
+      const data = await get("/products", { flagCodes: flag, offset: page * pageSize, limit: pageSize });
+      const items = itemsOf(data);
+      for (const p of items.map(parseItem)) if (!byId.has(p.productId)) byId.set(p.productId, p);
+      const total = Number(((data.result as Json | undefined)?.pagination as Json | undefined)?.total ?? NaN);
+      if (items.length < pageSize || (!Number.isNaN(total) && (page + 1) * pageSize >= total)) break;
+    }
   }
-  const seen = new Set<string>();
-  return sale
-    .filter((p) => !seen.has(p.productId) && seen.add(p.productId))
-    .sort((a, b) => discountPct(b) - discountPct(a));
+  return [...byId.values()];
 }

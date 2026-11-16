@@ -23,13 +23,14 @@ export async function GET(req: Request) {
       json = JSON.parse(text);
     } catch {}
     const result = (json as { result?: { items?: unknown[]; pagination?: unknown } } | null)?.result;
-    return Response.json({
+    return new Response(JSON.stringify({
       status: res.status,
       topKeys: json && typeof json === "object" ? Object.keys(json) : null,
       pagination: result?.pagination ?? null,
       firstItem: result?.items?.[0] ?? null,
+      contentType: res.headers.get("content-type"),
       raw: json ? undefined : text.slice(0, 2000),
-    });
+    }, null, 2), { headers: { "Content-Type": "application/json; charset=utf-8" } });
   } catch (e) {
     return Response.json({ error: String(e) }, { status: 500 });
   }

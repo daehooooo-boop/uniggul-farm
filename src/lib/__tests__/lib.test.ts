@@ -39,6 +39,19 @@ describe("parseItem", () => {
   });
 });
 
+describe("real response shape (2026-11)", () => {
+  it("parses the live /products item", () => {
+    const p = parseItem({
+      productId: "E465185-000", priceGroup: "00", name: "AIRism코튼오버사이즈크루넥T(5부)",
+      representativeColorDisplayCode: "69",
+      prices: { base: { currency: { code: "KRW", symbol: "₩" }, value: 19900 }, promo: null, isDualPrice: false },
+      images: { main: { "17": { image: "https://img/17.jpg" }, "69": { image: "https://img/69.jpg" }, "00": { image: "https://img/00.jpg" } } },
+    });
+    expect(p).toEqual({ productId: "E465185-000", priceGroup: "00", name: "AIRism코튼오버사이즈크루넥T(5부)", basePrice: 19900, promoPrice: null, image: "https://img/69.jpg" });
+    expect(isOnSale(p)).toBe(false);
+  });
+});
+
 describe("discord signature", () => {
   it("accepts valid and rejects tampered bodies", () => {
     const { publicKey, privateKey } = generateKeyPairSync("ed25519");

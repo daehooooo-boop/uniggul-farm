@@ -83,9 +83,12 @@ function priceValue(x: unknown): number | null {
 
 function firstImage(item: Json): string | null {
   const main = (item.images as Json | undefined)?.main;
-  const first = Array.isArray(main) ? main[0] : main && typeof main === "object" ? Object.values(main)[0] : null;
-  if (!first || typeof first !== "object") return null;
-  const f = first as Json;
+  if (!main || typeof main !== "object") return null;
+  // 대표 색상 이미지를 먼저, 없으면 아무거나 하나
+  const rep = String(item.representativeColorDisplayCode ?? "");
+  const pick = Array.isArray(main) ? main[0] : ((main as Json)[rep] ?? Object.values(main)[0]);
+  if (!pick || typeof pick !== "object") return null;
+  const f = pick as Json;
   return (f.image as string) ?? (f.url as string) ?? null;
 }
 

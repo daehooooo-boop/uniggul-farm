@@ -60,6 +60,37 @@ export async function GET(req: Request) {
     const out = await Promise.all(PROBES.map(summarize));
     return new Response(JSON.stringify(out, null, 2), { headers });
   }
+  if (sp.get("inspect")) {
+    // 할인 목록 첫 상품의 가격 관련 필드와 색상·사이즈별 가격(l2s)을 보여 준다
+    const flag = sp.get("inspect") ?? "discount";
+    const list = await fetch(`${BASE}?flagCodes=${flag}&offset=0&limit=3&httpFailure=true`, { headers: HEADERS, cache: "no-store" });
+    const lj = (await list.json().catch(() => null)) as { result?: { items?: Record<string, unknown>[] } } | null;
+    const out = [];
+    for (const it of lj?.result?.items ?? []) {
+      const pid = String(it.productId);
+      const pg = String(it.priceGroup ?? "00");
+      const l2 = await fetch(`${BASE}/${pid}/price-groups/${pg}/l2s?withPrices=true&withStocks=true&httpFailure=true`, { headers: HEADERS, cache: "no-store" });
+      const l2j = (await l2.json().catch(() => null)) as { result?: Record<string, unknown> } | null;
+      const r = l2j?.result ?? {};
+      const prices = (r.prices ?? {}) as Record<string, unknown>;
+      const pairs = new Map<string, number>();
+      for (const v of Object.values(prices)) {
+        const x = v as { base?: { value?: number }; promo?: { value?: number } | null };
+        const key = `${x.base?.value ?? "-"}/${x.promo?.value ?? "-"}`;
+        pairs.set(key, (pairs.get(key) ?? 0) + 1);
+      }
+      const { images: _i, colors: _c, sizes: _s, plds: _p, ...rest } = it;
+      void _i; void _c; void _s; void _p;
+      out.push({
+        item: rest,
+        l2Status: l2.status,
+        l2Keys: Object.keys(r),
+        l2BasePromoCounts: Object.fromEntries(pairs),
+        l2FirstPrice: Object.values(prices)[0] ?? null,
+      });
+    }
+    return new Response(JSON.stringify(out, null, 2), { headers });
+  }
   if (sp.get("q")) {
     // key 이외의 나머지 조건을 그대로 넘긴다
     const rest = new URLSearchParams(sp);

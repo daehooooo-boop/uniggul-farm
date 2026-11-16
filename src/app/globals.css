@@ -36,7 +36,7 @@
     transition: background-color 0.4s, color 0.4s;
     background: var(--bg);
     color: var(--fg);
-    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+    font: 14px/1.6 "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
     word-break: keep-all;
     -webkit-font-smoothing: antialiased;
   }

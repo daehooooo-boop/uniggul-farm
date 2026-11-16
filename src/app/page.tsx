@@ -15,14 +15,12 @@ const CHANNELS = [
   {
     id: "discord",
     name: "디스코드로 받기",
-    desc: "서버에 들어와 /등록 명령으로 상품을 저장하면 할인 소식이 DM으로 와요. 금요일 목록은 공용 채널에 올라가요.",
     url: DISCORD_URL,
     icon: "/discord.svg",
   },
   {
     id: "telegram",
     name: "텔레그램으로 받기",
-    desc: "봇을 열고 시작을 누른 뒤 상품 링크를 붙여넣으면 끝이에요. 금요일 목록도 같은 대화방으로 와요.",
     url: TELEGRAM_URL,
     icon: "/telegram.svg",
   },
@@ -59,25 +57,24 @@ export default async function Home() {
       <section className="sec">
         <h2 className="label">알림 받기</h2>
         <div className="grid">
-          {CHANNELS.map((c) => (
-            <article className="card" key={c.id}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={c.icon} width={64} height={64} alt="" />
-              <div className="txt">
-                <b>{c.name}</b>
-                <p>{c.desc}</p>
+          {CHANNELS.map((c) => {
+            const inner = (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={c.icon} width={64} height={64} alt="" />
+                <b className="ch-name">{c.name}</b>
+              </>
+            );
+            return c.url ? (
+              <a className="card link" key={c.id} href={c.url} target="_blank" rel="noopener">
+                {inner}
+              </a>
+            ) : (
+              <div className="card" key={c.id}>
+                {inner}
               </div>
-              {c.url ? (
-                <a className="pill" href={c.url} target="_blank" rel="noopener">
-                  열기
-                </a>
-              ) : (
-                <span className="pill" aria-disabled="true">
-                  준비 중
-                </span>
-              )}
-            </article>
-          ))}
+            );
+          })}
         </div>
       </section>
 
